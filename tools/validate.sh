@@ -40,6 +40,27 @@ run_static_checks() {
         tests/test_bsp_es8311_sleep_check.c components/bsp/src/bsp_es8311_sleep_check.c \
         -o "${test_dir}/test_bsp_es8311_sleep_check"
     "${test_dir}/test_bsp_es8311_sleep_check"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_radio_icy.c main/radio_icy.c \
+        -o "${test_dir}/test_radio_icy"
+    "${test_dir}/test_radio_icy"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_radio_frame.c main/radio_frame.c \
+        -o "${test_dir}/test_radio_frame"
+    "${test_dir}/test_radio_frame"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_radio_app.c main/radio_app.c \
+        -o "${test_dir}/test_radio_app"
+    "${test_dir}/test_radio_app"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_radio_favorites.c main/radio_favorites.c \
+        -o "${test_dir}/test_radio_favorites"
+    "${test_dir}/test_radio_favorites"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_radio_catalog.c main/radio_catalog.c main/radio_favorites.c \
+        -o "${test_dir}/test_radio_catalog"
+    "${test_dir}/test_radio_catalog"
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_radio_font_coverage.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_deep_sleep_contract.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_check_repo.py
     PYTHONDONTWRITEBYTECODE=1 python3 tests/test_verify_firmware.py

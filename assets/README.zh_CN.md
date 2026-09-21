@@ -14,6 +14,7 @@
 - 记录来源、许可、字符范围、转换命令与目标放置路径。
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
 - 不提交许可不允许分发的字库。
+- 本应用专用的字库子集与复现步骤见 [`fonts/README.zh_CN.md`](fonts/README.zh_CN.md)。
 
 ## 图片（images）
 

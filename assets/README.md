@@ -16,6 +16,7 @@ Store reusable font files and generated font sources in `fonts/`.
 - Document the source, license, character range, conversion command, and expected destination.
 - Check Flash and internal-RAM impact before adding a font; the ESP32-C3 has no PSRAM.
 - Do not commit fonts whose license does not permit redistribution.
+- Application-specific subsets and their reproduction steps are listed in [`fonts/README.md`](fonts/README.md).
 
 ## Images
 

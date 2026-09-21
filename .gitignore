@@ -4,3 +4,8 @@ sdkconfig.old
 managed_components/
 .vscode/
 .idea/
+# Local ESP-IDF checkout/toolchain and the agent skill bundle are environment-specific
+# and can weigh several gigabytes; keep them out of the repository even on a fresh
+# clone that does not have the equivalent .git/info/exclude entries.
+.idf/
+.agents/

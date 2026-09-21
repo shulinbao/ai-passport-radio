@@ -552,6 +552,45 @@ static void test_full_screen_scroll_window(void) {
     assert(radio_app_scroll(&app) == 0);
 }
 
+// 上/下 双击是 main.c 的系统级快捷键(熄屏,见 main.c 的 screen_off_shortcut_allowed)。
+// 状态机必须完全无视它:一旦它悄悄移动了光标或改了音量,"双击熄屏"就会顺手把界面
+// 也改掉 —— 用户看到的是"熄屏的同时收音机跳台/音量变了"。
+static void test_double_press_keys_are_ignored_by_the_state_machine(void) {
+    const radio_key_t keys[2] = {RADIO_KEY_UP_DOUBLE, RADIO_KEY_DOWN_DOUBLE};
+
+    for (int p = 0; p < RADIO_PAGE_COUNT; p++) {
+        reset();
+        app.page = (radio_page_t)p;
+        radio_app_set_row_count(&app, (radio_page_t)p, 8);
+
+        const int sel_before = radio_app_sel(&app);
+        const uint8_t vol_before = app.volume;
+        const uint8_t bright_before = app.brightness;
+
+        for (int k = 0; k < 2; k++) {
+            const radio_action_t a = press(keys[k]);
+            assert(a.kind == RADIO_ACT_NONE);
+        }
+        assert(app.page == (radio_page_t)p);
+        assert(radio_app_sel(&app) == sel_before);
+        assert(app.volume == vol_before);
+        assert(app.brightness == bright_before);
+        assert(app.adjust == 0);
+    }
+
+    // 调节模式下也一样:不能因为"双击"把数值改掉。
+    reset();
+    app.page = RADIO_PAGE_SETTINGS;
+    app.adjust = 1;
+    app.sel[RADIO_PAGE_SETTINGS] = RADIO_SET_ROW_VOLUME;
+    const uint8_t vol = app.volume;
+    for (int k = 0; k < 2; k++) {
+        assert(press(keys[k]).kind == RADIO_ACT_NONE);
+    }
+    assert(app.volume == vol);
+    assert(app.adjust == 1);          // 也不能顺手退出调节模式
+}
+
 static void test_null_app_is_safe(void) {
     radio_action_t a = radio_app_key(NULL, RADIO_KEY_OK);
     assert(a.kind == RADIO_ACT_NONE);
@@ -598,6 +637,7 @@ int main(void) {
     test_sleep_state_is_not_restored_by_init();
     test_sleep_formatting_and_bounds();
     test_full_screen_scroll_window();
+    test_double_press_keys_are_ignored_by_the_state_machine();
     test_null_app_is_safe();
     test_region_names_are_bounded();
     return 0;

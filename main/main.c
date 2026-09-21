@@ -11,9 +11,14 @@
 // 按键语义(与 radio_app.h 的约定一致):
 //   上/下 短按  移动选中项;播放页调音量;设置页改数值
 //   上/下 长按  电台列表页直接切换地区(港/新/马)
+//   上/下 双击  熄屏(只关背光,播放与联网继续;任意键唤醒)
 //   确定  短按  播放 / 进入子页 / 设置页进入调节模式 / 播放页暂停
 //   确定  长按  返回上一层;电台列表页打开菜单
 //   确定  双击  列表页收藏或取消收藏;播放页切下一个台
+//
+// 关于"熄屏为什么不在电源键上":本机的电源键是【硬件电源锁存】开关(按住 0.5 秒
+// 开机、按住约 2 秒断电),它没有接到 MCU 的任何一个 GPIO(docs/hardware-design 的
+// 引脚表把 0~10、18~21 全部占满了),固件读不到它 —— 所以"短按熄屏"只能落在功能键上。
 #include "bsp_audio.h"
 #include "bsp_battery.h"
 #include "bsp_button.h"
@@ -397,6 +402,38 @@ static void apply_action(radio_action_t action) {
 }
 
 // ---------------------------------------------------------------------------
+// 熄屏快捷键(双击上/下)
+//
+// 用户要的是"像手机电源键那样短按熄屏、音乐继续放"。本机做不到:电源键是硬件
+// 电源锁存开关(按住 0.5 秒开机、约 2 秒断电),没有连到 MCU 的任何 GPIO
+// (见 docs/hardware-design 的引脚表),固件读不到它。于是把"熄屏"绑到上/下 双击。
+//
+// 为什么不是所有页面都生效:电台/收藏/Wi-Fi 列表上"连续快按上/下"是常态动作,
+// 而双击判定窗口约 200ms,连续滚动会被误判成双击 —— 用户会看到"滚着滚着屏幕黑了",
+// 比"某些页面没有这个手势"烦人得多。所以只在不需要连续上下移动的页面生效。
+// ---------------------------------------------------------------------------
+static bool screen_off_shortcut_allowed(void) {
+    if (radio_ui_keyboard_active()) return false;   // 键盘在用时上/下是在选字
+    if (s_app.adjust) return false;                 // 设置页正在调数值
+    switch (s_app.page) {
+    case RADIO_PAGE_LIST:
+    case RADIO_PAGE_FAVORITES:
+    case RADIO_PAGE_WIFI:
+        return false;                               // 长列表:连续快按是常态
+    default:
+        return true;
+    }
+}
+
+static void screen_off_now(void) {
+    bsp_display_backlight(0);
+    s_backlight_on = false;
+    // 注意:调用方(dispatch_key)已经把手动操作计入活动,自动熄屏的计时是 0;
+    // 而且 s_backlight_on 为假时 tick_cb 里的自动熄屏分支不会再触发,也不会重绘。
+    ESP_LOGI(TAG, "双击上/下:关闭背光(播放与联网不受影响)");
+}
+
+// ---------------------------------------------------------------------------
 // 按键分发
 // ---------------------------------------------------------------------------
 static void dispatch_key(radio_key_t key) {
@@ -408,6 +445,15 @@ static void dispatch_key(radio_key_t key) {
         bsp_display_backlight(s_app.brightness);
         s_backlight_on = true;
         request_render();
+        return;
+    }
+
+    // 双击上/下 = 熄屏。放在"熄屏后第一下只唤醒"之后:黑屏状态下无论按什么键,
+    // 第一下都只负责唤醒,不会把这次双击误当成熄屏(否则黑屏时双击毫无反应)。
+    if (key == RADIO_KEY_UP_DOUBLE || key == RADIO_KEY_DOWN_DOUBLE) {
+        if (screen_off_shortcut_allowed()) {
+            screen_off_now();
+        }
         return;
     }
 
@@ -443,10 +489,12 @@ static radio_key_t map_button(bsp_btn_t btn, bsp_btn_ev_t event, bool *mapped) {
     case BSP_BTN_UP:
         if (event == BSP_BTN_CLICK) return RADIO_KEY_UP;
         if (event == BSP_BTN_LONG) return RADIO_KEY_UP_LONG;
+        if (event == BSP_BTN_DOUBLE) return RADIO_KEY_UP_DOUBLE;
         break;
     case BSP_BTN_DOWN:
         if (event == BSP_BTN_CLICK) return RADIO_KEY_DOWN;
         if (event == BSP_BTN_LONG) return RADIO_KEY_DOWN_LONG;
+        if (event == BSP_BTN_DOUBLE) return RADIO_KEY_DOWN_DOUBLE;
         break;
     case BSP_BTN_OK:
         if (event == BSP_BTN_CLICK) return RADIO_KEY_OK;
